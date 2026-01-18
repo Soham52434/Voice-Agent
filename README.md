@@ -1,12 +1,12 @@
 # SuperBryn Voice Agent
 
-A production-ready voice appointment booking system with AI assistant, visual avatar, and comprehensive admin dashboard.
+A production-ready voice appointment booking system with AI assistant, full-screen Beyond Presence avatar, and comprehensive admin dashboard.
 
 ## 🎯 Features
 
 ### User Portal (`/`)
 - Voice-based appointment booking with AI assistant
-- Visual avatar synced with speech (Beyond Presence)
+- **Full-screen Beyond Presence avatar** (via LiveKit BEY plugin)
 - Real-time transcript display
 - Tool call visualization
 - Session history with status tags (Pending/Booked/Completed)
@@ -33,11 +33,11 @@ A production-ready voice appointment booking system with AI assistant, visual av
 ├──────────────────┬──────────────────┬──────────────────────────────┤
 │    User Chat     │  Mentor Calendar │       Admin Dashboard         │
 │  + LiveKit Room  │  + Availability  │  + Stats, Users, Sessions    │
-│  + Avatar        │  + Appointments  │  + Cost Tracking             │
+│  + BEY Avatar    │  + Appointments  │  + Cost Tracking             │
 └────────┬─────────┴────────┬─────────┴────────────┬─────────────────┘
          │                  │                      │
          │ WebRTC           │ REST API             │ REST API
-         │                  │                      │
+         │ (video+audio)    │                      │
 ┌────────▼──────────────────▼──────────────────────▼─────────────────┐
 │                         BACKEND                                      │
 ├─────────────────────────────┬───────────────────────────────────────┤
@@ -45,7 +45,8 @@ A production-ready voice appointment booking system with AI assistant, visual av
 │    - Deepgram STT           │        - Auth endpoints               │
 │    - OpenAI LLM + Tools     │        - User/Mentor CRUD             │
 │    - Cartesia TTS           │        - Appointments                 │
-│    - Session tracking       │        - Sessions                     │
+│    - BEY Avatar Plugin      │        - Sessions                     │
+│    - Session tracking       │        - LiveKit tokens               │
 └────────────────┬────────────┴───────────────────┬───────────────────┘
                  │                                │
                  └────────────────┬───────────────┘
@@ -56,7 +57,6 @@ A production-ready voice appointment booking system with AI assistant, visual av
                     │  - appointments            │
                     │  - sessions, messages      │
                     │  - mentor_availability     │
-                    │  - cost_logs              │
                     └───────────────────────────┘
 ```
 
@@ -65,36 +65,53 @@ A production-ready voice appointment booking system with AI assistant, visual av
 ### 1. Database Setup
 
 1. Create a Supabase project at [supabase.com](https://supabase.com)
-2. Run `backend/schema.sql` in the SQL Editor
+2. **Automatic Setup**: Add `SUPABASE_DB_PASSWORD` to `.env` - tables will be created automatically!
+3. **Manual Setup**: Run `backend/schema.sql` in the SQL Editor
+4. The backend automatically falls back to in-memory storage if tables don't exist
 
 ### 2. Backend Setup
 
 ```bash
-cd backend
-
-# Create .env file
+# Create .env file in project root
 cat > .env << EOF
+# LiveKit
 LIVEKIT_URL=wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=your-api-key
 LIVEKIT_API_SECRET=your-api-secret
+
+# AI Services
 DEEPGRAM_API_KEY=your-deepgram-key
 CARTESIA_API_KEY=your-cartesia-key
 CARTESIA_VOICE_ID=a0e99841-438c-4a64-b679-ae501e7d6091
 OPENAI_API_KEY=your-openai-key
 OPENAI_MODEL=gpt-4o-mini
+
+# Beyond Presence Avatar
+BEY_API_KEY=your-beyond-presence-api-key
+BEY_AVATAR_ID=1c7a7291-ee28-4800-8f34-acfbfc2d07c0
+
+# Supabase
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-supabase-anon-key
+SUPABASE_DB_PASSWORD=your-db-password  # Optional: enables auto table creation
+
+# Auth
 JWT_SECRET=your-jwt-secret-change-this
 EOF
 
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
 # Install dependencies
-pip install -r ../requirements.txt
+uv add livekit-agents[deepgram,cartesia,openai,silero,bey]
+pip install -r requirements.txt
 
-# Start API server
-uvicorn api:app --reload --port 8000
+# Start API server (in one terminal)
+cd backend && python api.py
 
-# In another terminal, start voice agent
-python main.py dev
+# Start voice agent (in another terminal)
+cd backend && python main.py start
 ```
 
 ### 3. Frontend Setup
@@ -103,7 +120,10 @@ python main.py dev
 cd frontend
 
 # Create .env.local
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+cat > .env.local << EOF
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_LIVEKIT_URL=wss://your-project.livekit.cloud
+EOF
 
 # Install dependencies
 npm install
@@ -122,110 +142,66 @@ npm run dev
 - Mentor: `sarah@example.com` / `mentor123`
 - Admin: `admin@superbryn.com` / `admin123`
 
+## 🎭 Beyond Presence Avatar
+
+The avatar is integrated using the **LiveKit BEY plugin**, not a frontend SDK. This means:
+
+1. The avatar runs on the backend as a LiveKit participant
+2. Video is streamed to the frontend via WebRTC
+3. The avatar automatically syncs with TTS audio
+4. Full-screen display with smooth video
+
+**Setup:**
+1. Get your API key from [app.bey.chat](https://app.bey.chat)
+2. Get your avatar ID from [app.bey.chat/avatars](https://app.bey.chat/avatars)
+3. Add to `.env`:
+   ```
+   BEY_API_KEY=your-api-key
+   BEY_AVATAR_ID=1c7a7291-ee28-4800-8f34-acfbfc2d07c0
+   ```
+
+Reference: [LiveKit BEY Plugin Docs](https://docs.livekit.io/agents/models/avatar/plugins/bey/)
+
+## 🔧 Troubleshooting
+
+### Avatar Not Showing
+- Verify `BEY_API_KEY` is set in `.env`
+- Check agent logs for "Avatar started successfully" or error messages
+- Ensure `BEY_AVATAR_ID` is a valid avatar from your account
+
+### Database Errors
+- The backend automatically falls back to in-memory storage
+- Run `backend/schema.sql` in Supabase SQL Editor to create tables
+- Continue using in-memory mode for testing
+
+### LiveKit Connection Issues
+- Verify `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` in `.env`
+- Check that `NEXT_PUBLIC_LIVEKIT_URL` matches in frontend `.env.local`
+- Ensure microphone permissions are granted in browser
+
 ## 📁 Project Structure
 
 ```
 Voice-Agent/
 ├── backend/
-│   ├── main.py          # LiveKit voice agent
+│   ├── main.py          # LiveKit voice agent with BEY avatar
 │   ├── api.py           # FastAPI REST endpoints
-│   ├── db.py            # Database operations
+│   ├── db.py            # Database operations (with fallback)
 │   └── schema.sql       # Supabase schema
 ├── frontend/
 │   └── src/
 │       ├── app/
 │       │   ├── page.tsx           # User login
-│       │   ├── chat/page.tsx      # User chat interface
-│       │   ├── mentor/
-│       │   │   ├── login/page.tsx
-│       │   │   └── page.tsx       # Mentor dashboard
-│       │   └── admin/
-│       │       ├── login/page.tsx
-│       │       └── page.tsx       # Admin dashboard
+│       │   ├── chat/page.tsx      # Full-screen avatar chat
+│       │   ├── mentor/            # Mentor dashboard
+│       │   └── admin/             # Admin dashboard
+│       ├── components/
+│       │   └── LiveKitRoom.tsx    # LiveKit + avatar video
 │       └── lib/
 │           ├── api.ts             # API client
 │           └── store.ts           # Zustand stores
 ├── requirements.txt
 └── README.md
-```
-
-## 🔧 API Endpoints
-
-### Authentication
-- `POST /api/auth/user/login` - User login (phone + name)
-- `POST /api/auth/mentor/login` - Mentor login (email + password)
-- `POST /api/auth/admin/login` - Admin login
-- `GET /api/auth/me` - Get current user
-
-### Users
-- `GET /api/users` - List users (admin)
-- `POST /api/users` - Create user (admin)
-- `GET /api/users/{phone}/sessions` - User's sessions
-- `GET /api/users/{phone}/appointments` - User's appointments
-
-### Mentors
-- `GET /api/mentors` - List mentors
-- `POST /api/mentors` - Create mentor (admin)
-- `GET /api/mentors/{id}/availability` - Get availability
-- `POST /api/mentors/{id}/availability` - Add availability
-- `GET /api/mentors/{id}/slots?date=YYYY-MM-DD` - Get slots for date
-
-### Appointments
-- `GET /api/appointments` - List appointments
-- `GET /api/appointments/calendar` - Calendar view
-- `PUT /api/appointments/{id}` - Update status/notes
-
-### Sessions
-- `GET /api/sessions` - List all sessions (admin)
-- `GET /api/sessions/{id}` - Session with messages
-
-### Admin
-- `GET /api/admin/stats` - Dashboard statistics
-- `GET /api/admin/costs` - Cost report
-- `GET /api/admin/costs/sessions` - Per-session costs
-
-### LiveKit
-- `GET /api/livekit/token` - Get room token for voice chat
-
-## 🤖 Voice Agent Tools
-
-| Tool | Description |
-|------|-------------|
-| `identify_user` | Identify user by phone, load context |
-| `fetch_slots` | Get available appointment slots |
-| `book_appointment` | Book an appointment |
-| `retrieve_appointments` | Get user's appointments |
-| `cancel_appointment` | Cancel an appointment |
-| `modify_appointment` | Reschedule appointment |
-| `end_conversation` | End call with summary |
-
-## 💰 Cost Tracking
-
-The system tracks costs for:
-- **Deepgram STT**: $0.0043/minute
-- **Cartesia TTS**: $0.0015/100 characters
-- **OpenAI GPT-4o-mini**: $0.00015/1K input, $0.0006/1K output
-
-Costs are displayed at end of each call and aggregated in admin dashboard.
-
-## 🔌 Beyond Presence Avatar Integration
-
-To integrate Beyond Presence avatar:
-
-1. Sign up at [beyondpresence.ai](https://beyondpresence.ai)
-2. Get your API credentials
-3. Replace the avatar placeholder in `frontend/src/app/chat/page.tsx`:
-
-```tsx
-// Replace the avatar container with Beyond Presence component
-import { BeyondPresenceAvatar } from '@beyondpresence/react';
-
-<BeyondPresenceAvatar
-  apiKey={process.env.NEXT_PUBLIC_BP_API_KEY}
-  avatarId="your-avatar-id"
-  isSpeaking={isSpeaking}
-  audioStream={audioStream}
-/>
 ```
 
 ## 📝 License

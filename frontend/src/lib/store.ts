@@ -55,4 +55,3 @@ export const useChat = create<ChatState>((set) => ({
   setSummary: (summary) => set({ summary }),
   clearChat: () => set({ toolCalls: [], transcript: [], summary: null }),
 }));
-

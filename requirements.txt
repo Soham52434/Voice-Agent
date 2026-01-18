@@ -21,6 +21,7 @@ bcrypt>=4.1.0
 
 # Database
 supabase>=2.3.0
+psycopg2-binary>=2.9.0  # For direct PostgreSQL connection (auto-schema creation)
 
 # Utilities
 python-dotenv>=1.0.0

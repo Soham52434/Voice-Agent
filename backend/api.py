@@ -5,6 +5,7 @@ Provides REST API for frontend (users, mentors, admin, appointments)
 import os
 import jwt
 import bcrypt
+import logging
 from datetime import datetime, timedelta, date, time
 from typing import Optional, List
 from functools import wraps
@@ -14,10 +15,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Load .env from project root (parent of backend directory)
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    # Also try backend/.env
+    load_dotenv(Path(__file__).parent / ".env")
+    # And current directory
+    load_dotenv()
 
 from db import Database
+
+logger = logging.getLogger(__name__)
 
 # ==================== APP SETUP ====================
 
@@ -274,8 +286,13 @@ async def get_user_sessions(phone: str, token: dict = Depends(verify_token)):
     if token.get("type") == "user" and token.get("sub") != phone:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    sessions = db.get_user_sessions(phone, limit=50)
-    return sessions
+    try:
+        sessions = db.get_user_sessions(phone, limit=50)
+        return sessions
+    except Exception as e:
+        # If database error, return empty list
+        logger.error(f"Error fetching sessions: {e}")
+        return []
 
 @app.get("/api/users/{phone}/appointments")
 async def get_user_appointments(
@@ -530,42 +547,82 @@ async def get_session_costs(
 @app.get("/api/livekit/token")
 async def get_livekit_token(token: dict = Depends(require_user)):
     """Get LiveKit room token for voice chat"""
-    from livekit import api
-    
-    user_phone = token.get("sub")
-    user_name = token.get("name", "User")
-    
-    # Create unique room name
-    room_name = f"voice-{user_phone}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    
-    # Generate LiveKit token
-    lk_api = api.LiveKitAPI(
-        os.getenv("LIVEKIT_URL"),
-        os.getenv("LIVEKIT_API_KEY"),
-        os.getenv("LIVEKIT_API_SECRET")
-    )
-    
-    token_opts = api.VideoGrants(
-        room_join=True,
-        room=room_name,
-    )
-    
-    participant_token = api.AccessToken(
-        os.getenv("LIVEKIT_API_KEY"),
-        os.getenv("LIVEKIT_API_SECRET")
-    ).with_identity(user_phone).with_name(user_name).with_grants(token_opts).to_jwt()
-    
-    return {
-        "token": participant_token,
-        "room_name": room_name,
-        "livekit_url": os.getenv("LIVEKIT_URL")
-    }
+    try:
+        from livekit import api as livekit_api
+        
+        user_phone = token.get("sub")
+        user_name = token.get("name", "User")
+        
+        # Create unique room name
+        room_name = f"voice-{user_phone.replace('+', '')}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # Generate LiveKit token
+        livekit_url = os.getenv("LIVEKIT_URL")
+        api_key = os.getenv("LIVEKIT_API_KEY")
+        api_secret = os.getenv("LIVEKIT_API_SECRET")
+        
+        if not all([livekit_url, api_key, api_secret]):
+            raise HTTPException(status_code=500, detail="LiveKit configuration missing")
+        
+        token_opts = livekit_api.VideoGrants(
+            room_join=True,
+            room=room_name,
+        )
+        
+        participant_token = livekit_api.AccessToken(
+            api_key,
+            api_secret
+        ).with_identity(user_phone).with_name(user_name).with_grants(token_opts).to_jwt()
+        
+        return {
+            "token": participant_token,
+            "room_name": room_name,
+            "livekit_url": livekit_url
+        }
+    except ImportError:
+        raise HTTPException(status_code=500, detail="LiveKit API not installed. Install: pip install livekit-api")
+    except Exception as e:
+        logger.error(f"Failed to generate LiveKit token: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate token: {str(e)}")
 
 # ==================== HEALTH CHECK ====================
 
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.get("/api/db/status")
+async def db_status():
+    """Check database connection status."""
+    status = {
+        "enabled": db._enabled,
+        "using_supabase": db._enabled and db.client is not None,
+        "using_memory": not db._enabled,
+        "supabase_url_set": bool(os.getenv("SUPABASE_URL")),
+        "supabase_key_set": bool(os.getenv("SUPABASE_KEY")),
+    }
+    
+    if db._enabled and db.client:
+        try:
+            # Try a simple query to verify connection
+            db.client.table("users").select("id").limit(1).execute()
+            status["connection_test"] = "success"
+            status["message"] = "Connected to Supabase"
+        except Exception as e:
+            error_msg = str(e)
+            if "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
+                status["connection_test"] = "tables_missing"
+                status["message"] = "Connected but tables not found. Run backend/schema.sql in Supabase."
+            else:
+                status["connection_test"] = "failed"
+                status["message"] = f"Connection error: {error_msg}"
+    else:
+        if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
+            status["message"] = "SUPABASE_URL and/or SUPABASE_KEY not set in .env"
+        else:
+            status["message"] = "Using in-memory storage"
+    
+    return status
 
 # ==================== RUN ====================
 
