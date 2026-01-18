@@ -23,14 +23,6 @@ export default function ChatPage() {
   
   const avatarContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-connect on page load (no auth required initially)
-  useEffect(() => {
-    // Auto-connect to LiveKit
-    if (!isConnected && !roomInfo) {
-      connectToLiveKit();
-    }
-  }, []);
-
   // Load sessions and appointments when user is identified
   useEffect(() => {
     if (user?.phone) {
@@ -244,7 +236,7 @@ export default function ChatPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-lg font-semibold text-white">SuperBryn Assistant</h1>
+          <h1 className="text-lg font-semibold text-white">Voice Assistant</h1>
           <div className="w-6" />
         </div>
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SuperBryn Voice Agent",
+  title: "Voice Agent",
   description: "AI-powered appointment booking assistant",
 };
 

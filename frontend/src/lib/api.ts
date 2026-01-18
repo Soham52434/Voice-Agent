@@ -89,6 +89,13 @@ class ApiClient {
     return this.request<any[]>('/api/mentors');
   }
 
+  async createMentor(data: { name: string; email: string; password: string; specialty?: string; bio?: string; phone?: string }) {
+    return this.request<any>('/api/mentors', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getMentorAvailability(mentorId: string, startDate?: string, endDate?: string) {
     const params = new URLSearchParams();
     if (startDate) params.append('start_date', startDate);
