@@ -1,0 +1,23 @@
+[project]
+name = "voice-agent"
+version = "0.1.0"
+description = "Voice-based appointment booking agent using LiveKit"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # LiveKit Agents Framework
+    "livekit-agents>=1.0.0",
+    # Official LiveKit Plugins
+    "livekit-plugins-deepgram>=1.0.0",
+    "livekit-plugins-cartesia>=1.0.0",
+    "livekit-plugins-openai>=1.0.0",
+    "livekit-plugins-silero>=1.0.0",
+    # Database
+    "supabase>=2.3.0",
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "python-dateutil>=2.8.2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]

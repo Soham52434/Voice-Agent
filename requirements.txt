@@ -1,0 +1,15 @@
+# LiveKit Agents Framework
+livekit-agents>=1.0.0
+
+# Official LiveKit Plugins (these handle EVERYTHING)
+livekit-plugins-deepgram>=1.0.0   # STT
+livekit-plugins-cartesia>=1.0.0   # TTS
+livekit-plugins-openai>=1.0.0     # LLM
+livekit-plugins-silero>=1.0.0     # VAD
+
+# Database
+supabase>=2.3.0
+
+# Utilities
+python-dotenv>=1.0.0
+python-dateutil>=2.8.2
