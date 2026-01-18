@@ -5,28 +5,39 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth, useChat } from "@/lib/store";
 import LiveKitRoom from "@/components/LiveKitRoom";
+import CallingLoader from "@/components/CallingLoader";
 
 export default function ChatPage() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, setAuth } = useAuth();
   const { sessions, setSessions, toolCalls, transcript, summary, setSummary, clearChat } = useChat();
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [roomInfo, setRoomInfo] = useState<{ token: string; room_name: string; livekit_url: string } | null>(null);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [avatarVideo, setAvatarVideo] = useState<HTMLVideoElement | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   
   const avatarContainerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-connect on page load (no auth required initially)
   useEffect(() => {
-    if (!user) {
-      router.push("/");
-      return;
+    // Auto-connect to LiveKit
+    if (!isConnected && !roomInfo) {
+      connectToLiveKit();
     }
-    loadSessions();
-  }, [user, router]);
+  }, []);
+
+  // Load sessions and appointments when user is identified
+  useEffect(() => {
+    if (user?.phone) {
+      loadSessions();
+      loadAppointments();
+    }
+  }, [user?.phone]);
 
   // Attach avatar video to container when available
   useEffect(() => {
@@ -34,6 +45,8 @@ export default function ChatPage() {
       // Clear existing content
       avatarContainerRef.current.innerHTML = "";
       avatarContainerRef.current.appendChild(avatarVideo);
+      // Avatar is ready, hide loader
+      setIsConnecting(false);
     }
     
     return () => {
@@ -53,19 +66,34 @@ export default function ChatPage() {
     }
   };
 
-  const startCall = async () => {
+  const loadAppointments = async () => {
+    if (!user?.phone) return;
+    try {
+      const data = await api.getUserAppointments(user.phone);
+      setAppointments(data);
+    } catch {
+      setAppointments([]);
+    }
+  };
+
+  const connectToLiveKit = async () => {
     try {
       clearChat();
+      setIsConnecting(true);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setAudioStream(stream);
       const data = await api.getLiveKitToken();
       setRoomInfo(data);
       setIsConnected(true);
+      // Keep connecting state until avatar video is ready
     } catch (err: any) {
-      console.error("Failed to start call:", err);
-      alert(err.message || "Failed to start call. Check microphone permissions.");
+      console.error("Failed to connect:", err);
+      setIsConnecting(false);
+      alert(err.message || "Failed to connect. Check microphone permissions.");
     }
   };
+
+  const startCall = connectToLiveKit;
 
   const endCall = useCallback(() => {
     if (audioStream) {
@@ -74,6 +102,7 @@ export default function ChatPage() {
     }
     setAvatarVideo(null);
     setIsConnected(false);
+    setIsConnecting(false);
     setRoomInfo(null);
     setIsSpeaking(false);
     loadSessions();
@@ -93,7 +122,15 @@ export default function ChatPage() {
     router.push("/");
   };
 
-  if (!user) return null;
+  // Handle user identification from agent
+  const handleContextLoaded = useCallback((data: any) => {
+    if (data.user?.phone) {
+      // User identified - set auth and load appointments
+      setAuth({ ...data.user, type: "user" }, "temp-token");
+      loadSessions();
+      loadAppointments();
+    }
+  }, [setAuth, loadSessions]);
 
   return (
     <div className="h-screen flex bg-slate-900">
@@ -101,39 +138,97 @@ export default function ChatPage() {
       <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-800 shadow-xl transform transition-transform lg:relative lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-            <h2 className="font-semibold text-white">Your Chats</h2>
+            <h2 className="font-semibold text-white">My Appointments</h2>
             <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">✕</button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2">
-            {sessions.map((session: any) => (
-              <div key={session.id} className="p-3 mb-2 bg-slate-700/50 rounded-lg hover:bg-slate-700">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-sm font-medium text-white">
-                    {new Date(session.started_at).toLocaleDateString()}
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${session.status === "active" ? "bg-green-500/20 text-green-400" : "bg-slate-600 text-slate-300"}`}>
-                    {session.status}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 truncate">{session.summary || "No summary"}</p>
+            {/* Appointments Section */}
+            {appointments.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2 px-2">Bookings</h3>
+                {appointments.map((apt: any) => (
+                  <div key={apt.id} className="p-3 mb-2 bg-slate-700/50 rounded-lg hover:bg-slate-700">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="text-sm font-medium text-white">
+                        {new Date(apt.date).toLocaleDateString()}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        apt.status === "confirmed" ? "bg-green-500/20 text-green-400" : 
+                        apt.status === "pending" ? "bg-yellow-500/20 text-yellow-400" : 
+                        "bg-slate-600 text-slate-300"
+                      }`}>
+                        {apt.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 font-medium mb-1">
+                      {apt.time} - {apt.mentors?.name || "Mentor"}
+                    </p>
+                    {apt.notes && (
+                      <p className="text-xs text-slate-400 truncate">{apt.notes}</p>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-            {sessions.length === 0 && (
-              <p className="text-center text-slate-500 text-sm py-8">No previous chats</p>
             )}
+
+            {/* Sessions Section */}
+            <div className="mb-4">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2 px-2">Chat History</h3>
+              {sessions.map((session: any) => (
+                <div key={session.id} className="p-3 mb-2 bg-slate-700/50 rounded-lg hover:bg-slate-700">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-sm font-medium text-white">
+                      {new Date(session.started_at).toLocaleDateString()}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${session.status === "active" ? "bg-green-500/20 text-green-400" : "bg-slate-600 text-slate-300"}`}>
+                      {session.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 truncate">{session.summary || "No summary"}</p>
+                </div>
+              ))}
+              {sessions.length === 0 && appointments.length === 0 && (
+                <p className="text-center text-slate-500 text-sm py-8">No appointments or chats yet</p>
+              )}
+            </div>
           </div>
 
-          <div className="p-4 border-t border-slate-700 bg-slate-800/50">
+          <div className="p-4 border-t border-slate-700 bg-slate-800/50 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-white">{user.name}</p>
-                <p className="text-xs text-slate-400">{user.phone}</p>
+                <p className="font-medium text-white">{user?.name || "Guest"}</p>
+                <p className="text-xs text-slate-400">{user?.phone || "Not identified"}</p>
               </div>
-              <button onClick={handleLogout} className="text-slate-400 hover:text-red-400">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              {user && (
+                <button onClick={handleLogout} className="text-slate-400 hover:text-red-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            
+            {/* Navigation Links */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-700">
+              <button
+                onClick={() => router.push("/mentor/login")}
+                className="w-full px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
+                Mentor Login
+              </button>
+              <button
+                onClick={() => router.push("/admin/login")}
+                className="w-full px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Admin Login
               </button>
             </div>
           </div>
@@ -162,7 +257,7 @@ export default function ChatPage() {
             style={{ backgroundColor: '#1a1a2e' }}
           >
             {/* Placeholder when no avatar video */}
-            {!avatarVideo && (
+            {!avatarVideo && !isConnecting && (
               <div className="flex flex-col items-center justify-center text-white/60">
                 <div className={`w-48 h-48 rounded-full bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center mb-6 ${isSpeaking ? 'animate-pulse' : ''}`}>
                   <svg className="w-24 h-24 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -170,9 +265,9 @@ export default function ChatPage() {
                   </svg>
                 </div>
                 {isConnected ? (
-                  <p className="text-sm">Connecting to avatar...</p>
+                  <p className="text-sm text-white">Waiting for avatar...</p>
                 ) : (
-                  <p className="text-sm">Start a call to see the avatar</p>
+                  <p className="text-sm text-white">Start a call to see the avatar</p>
                 )}
               </div>
             )}
@@ -262,9 +357,13 @@ export default function ChatPage() {
             onDisconnect={endCall}
             onSpeakingChange={handleSpeakingChange}
             onAvatarVideo={handleAvatarVideo}
+            onContextLoaded={handleContextLoaded}
             audioStream={audioStream || undefined}
           />
         )}
+
+        {/* Calling Loader */}
+        <CallingLoader isConnecting={isConnecting} />
 
         {/* Summary Modal */}
         {summary && (
@@ -292,13 +391,6 @@ export default function ChatPage() {
                   {summary.upcoming_appointments.map((apt: any, i: number) => (
                     <p key={i} className="text-sm text-white">📅 {apt.date} at {apt.time}</p>
                   ))}
-                </div>
-              )}
-
-              {summary.cost_breakdown && (
-                <div className="mb-4 p-3 bg-slate-700/50 rounded-lg">
-                  <h3 className="text-sm font-medium text-slate-400 mb-1">Cost</h3>
-                  <p className="text-2xl font-bold text-indigo-400">${summary.cost_breakdown.total?.toFixed(4)}</p>
                 </div>
               )}
 

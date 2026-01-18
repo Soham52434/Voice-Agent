@@ -11,6 +11,7 @@ interface LiveKitRoomProps {
   onDisconnect: () => void;
   onSpeakingChange: (isSpeaking: boolean) => void;
   onAvatarVideo?: (videoElement: HTMLVideoElement | null) => void;
+  onContextLoaded?: (data: any) => void;
   audioStream?: MediaStream;
 }
 
@@ -21,6 +22,7 @@ export default function LiveKitRoom({
   onDisconnect,
   onSpeakingChange,
   onAvatarVideo,
+  onContextLoaded,
   audioStream,
 }: LiveKitRoomProps) {
   const roomRef = useRef<Room | null>(null);
@@ -123,9 +125,25 @@ export default function LiveKitRoom({
         room.on(RoomEvent.ParticipantConnected, (participant) => {
           console.log("Participant connected:", participant.identity);
           
+          // If this is the avatar participant, explicitly subscribe to its video track
+          if (participant.identity === "avatar-agent" || participant.identity.includes("avatar")) {
+            console.log("🎭 Avatar participant detected, subscribing to video...");
+            
+            // Subscribe to video track publications
+            participant.videoTrackPublications.forEach((pub) => {
+              if (!pub.isSubscribed) {
+                console.log(`Subscribing to video track: ${pub.trackSid}`);
+                participant.setSubscribed(pub.trackSid, true);
+              } else if (pub.track) {
+                // Track already subscribed, attach it
+                handleExistingTrack(pub.track, participant);
+              }
+            });
+          }
+          
           // Subscribe to existing tracks
           participant.trackPublications.forEach((pub) => {
-            if (pub.track) {
+            if (pub.track && pub.isSubscribed) {
               handleExistingTrack(pub.track, participant);
             }
           });
@@ -142,9 +160,25 @@ export default function LiveKitRoom({
         await room.connect(serverUrl, token);
         console.log("✅ Connected to LiveKit room:", roomName);
 
-        // Check for existing participants and their tracks
+        // Check for existing participants and subscribe to avatar video
         room.remoteParticipants.forEach((participant) => {
           console.log("Existing participant:", participant.identity);
+          
+          // Explicitly subscribe to avatar video tracks
+          if (participant.identity === "avatar-agent" || participant.identity.includes("avatar")) {
+            console.log("🎭 Found avatar participant, subscribing to video...");
+            participant.videoTrackPublications.forEach((pub) => {
+              if (!pub.isSubscribed) {
+                console.log(`Subscribing to existing video track: ${pub.trackSid}`);
+                participant.setSubscribed(pub.trackSid, true);
+              } else if (pub.track) {
+                // Already subscribed, attach it
+                handleExistingTrack(pub.track, participant);
+              }
+            });
+          }
+          
+          // Handle already subscribed tracks
           participant.trackPublications.forEach((pub) => {
             if (pub.track && pub.isSubscribed) {
               handleExistingTrack(pub.track, participant);
@@ -236,8 +270,17 @@ export default function LiveKitRoom({
       case "summary":
         setSummary(data);
         break;
+      case "context_loaded":
+        if (onContextLoaded) {
+          onContextLoaded(data);
+        }
+        break;
+      case "avatar_ready":
+        // Avatar and STT/TTS are now ready
+        console.log("✅ Avatar and STT/TTS ready:", data);
+        break;
     }
-  }, [addTranscript, addToolCall, setSummary]);
+  }, [addTranscript, addToolCall, setSummary, onContextLoaded]);
 
   return null;
 }

@@ -107,6 +107,14 @@ class ApiClient {
     return this.request<any[]>(`/api/mentors/${mentorId}/slots?date=${date}`);
   }
 
+  async getMentorAppointments(mentorId: string, status?: string, startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return this.request<any[]>(`/api/mentors/${mentorId}/appointments?${params}`);
+  }
+
   // Appointments
   async getAppointments() {
     return this.request<any[]>('/api/appointments');

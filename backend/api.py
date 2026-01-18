@@ -125,6 +125,16 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+def verify_token_optional(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict | None:
+    """Optional token verification - returns None if no token provided."""
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except:
+        return None
+
 def require_admin(token: dict = Depends(verify_token)) -> dict:
     if token.get("type") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -443,6 +453,20 @@ async def list_appointments(
     
     raise HTTPException(status_code=403, detail="Access denied")
 
+@app.get("/api/mentors/{mentor_id}/appointments")
+async def get_mentor_appointments_endpoint(
+    mentor_id: str,
+    status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    token: dict = Depends(verify_token)
+):
+    """Get appointments for a specific mentor"""
+    if token.get("type") == "mentor" and token.get("sub") != mentor_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return db.get_mentor_appointments(mentor_id, status, start_date, end_date)
+
 @app.get("/api/appointments/calendar")
 async def get_appointments_calendar(
     mentor_id: str,
@@ -545,16 +569,17 @@ async def get_session_costs(
 # ==================== LIVEKIT TOKEN ENDPOINT ====================
 
 @app.get("/api/livekit/token")
-async def get_livekit_token(token: dict = Depends(require_user)):
-    """Get LiveKit room token for voice chat"""
+async def get_livekit_token(token: dict = Depends(verify_token_optional)):
+    """Get LiveKit room token for voice chat. Auth optional - user will be identified via voice."""
     try:
         from livekit import api as livekit_api
         
-        user_phone = token.get("sub")
-        user_name = token.get("name", "User")
+        # Get user info from token if available, otherwise use temp
+        user_phone = token.get("sub") if token else f"temp-{datetime.now().timestamp()}"
+        user_name = token.get("name", "User") if token else "Guest"
         
         # Create unique room name
-        room_name = f"voice-{user_phone.replace('+', '')}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        room_name = f"voice-{user_phone.replace('+', '').replace('.', '')}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
         # Generate LiveKit token
         livekit_url = os.getenv("LIVEKIT_URL")

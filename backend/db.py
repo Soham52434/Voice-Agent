@@ -3,6 +3,7 @@ Database operations for Voice Agent.
 Simplified with Supabase + in-memory fallback.
 """
 import os
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 from pathlib import Path
@@ -11,6 +12,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(env_path) if env_path.exists() else load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class Database:
@@ -154,13 +157,41 @@ class Database:
             )
         return self._db(from_db, from_memory)
     
-    def book_appointment(self, phone: str, date_str: str, time_str: str, mentor_id: str = None, notes: str = None) -> dict:
+    def is_mentor_available(self, mentor_id: str, date_str: str, time_str: str) -> bool:
+        """Check if mentor has availability set for the given date and time."""
+        def from_db():
+            # Check if mentor has availability entry for this date
+            avail = self.client.table("mentor_availability").select("*").eq("mentor_id", mentor_id).eq("date", date_str).eq("is_available", True).execute()
+            if not avail.data:
+                return False
+            
+            # Check if time is within any availability window
+            try:
+                from datetime import datetime, time as dt_time
+                slot_time = datetime.strptime(time_str, "%H:%M").time()
+                for a in avail.data:
+                    start = datetime.strptime(a["start_time"], "%H:%M:%S").time()
+                    end = datetime.strptime(a["end_time"], "%H:%M:%S").time()
+                    if start <= slot_time < end:
+                        return True
+            except Exception as e:
+                logger.debug(f"Error checking mentor availability: {e}")
+            return False
+        
+        def from_memory():
+            # In-memory: assume available if not in booked list
+            return True
+        
+        return self._db(from_db, from_memory)
+    
+    def book_appointment(self, phone: str, date_str: str, time_str: str, mentor_id: str = None, notes: str = None, duration_minutes: int = 60) -> dict:
         user = self.get_or_create_user(phone)
         data = {
             "user_id": user.get("id"),
             "contact_number": phone,
             "date": date_str,
             "time": time_str,
+            "duration_minutes": duration_minutes,
             "status": "booked",
             "mentor_id": mentor_id,
             "notes": notes,
@@ -199,17 +230,60 @@ class Database:
             return False
         return self._db(from_db, from_memory)
     
-    def modify_appointment(self, phone: str, old_date: str, old_time: str, new_date: str, new_time: str) -> dict | None:
-        if self.is_slot_booked(new_date, new_time):
-            return None
+    def cancel_appointment_by_id(self, appointment_id: str) -> bool:
+        """Cancel appointment by ID."""
         def from_db():
-            res = self.client.table("appointments").update({"date": new_date, "time": new_time}).eq("contact_number", phone).eq("date", old_date).eq("time", old_time).in_("status", ["pending", "booked"]).execute()
+            res = self.client.table("appointments").update({"status": "cancelled"}).eq("id", appointment_id).in_("status", ["pending", "booked"]).execute()
+            return bool(res.data)
+        def from_memory():
+            for apt in self._appointments:
+                if apt.get("id") == appointment_id and apt["status"] in ("pending", "booked"):
+                    apt["status"] = "cancelled"
+                    return True
+            return False
+        return self._db(from_db, from_memory)
+    
+    def modify_appointment(self, phone: str, old_date: str, old_time: str, new_date: str, new_time: str, mentor_id: str = None) -> dict | None:
+        """Modify appointment date/time. If mentor_id provided, validates availability. Preserves mentor_id if not provided."""
+        # If mentor_id provided, check availability
+        if mentor_id:
+            if not self.is_mentor_available(mentor_id, new_date, new_time):
+                return None
+            if self.is_slot_booked(new_date, new_time, mentor_id):
+                return None
+        else:
+            # Check globally if no mentor_id
+            if self.is_slot_booked(new_date, new_time):
+                return None
+        
+        def from_db():
+            # First get the appointment to preserve mentor_id
+            old_apt = self.client.table("appointments").select("*").eq("contact_number", phone).eq("date", old_date).eq("time", old_time).in_("status", ["pending", "booked"]).execute()
+            if not old_apt.data:
+                return None
+            
+            existing_mentor_id = old_apt.data[0].get("mentor_id")
+            # Use provided mentor_id or preserve existing one
+            final_mentor_id = mentor_id if mentor_id else existing_mentor_id
+            
+            # Update with preserved mentor_id
+            update_data = {"date": new_date, "time": new_time, "updated_at": datetime.now().isoformat()}
+            if final_mentor_id:
+                update_data["mentor_id"] = final_mentor_id
+            
+            res = self.client.table("appointments").update(update_data).eq("contact_number", phone).eq("date", old_date).eq("time", old_time).in_("status", ["pending", "booked"]).execute()
             return res.data[0] if res.data else None
         def from_memory():
             for apt in self._appointments:
                 if apt["contact_number"] == phone and apt["date"] == old_date and apt["time"] == old_time and apt["status"] in ("pending", "booked"):
                     apt["date"] = new_date
                     apt["time"] = new_time
+                    # Preserve or set mentor_id
+                    if mentor_id:
+                        apt["mentor_id"] = mentor_id
+                    elif not apt.get("mentor_id"):
+                        # Keep existing mentor_id
+                        pass
                     return apt
             return None
         return self._db(from_db, from_memory)
@@ -283,6 +357,51 @@ class Database:
         user = self.get_or_create_user(phone)
         self.update_session(session_id, contact_number=phone, user_id=user.get("id"))
     
+    def log_cost(self, session_id: str, service: str, units: float, unit_type: str, cost_usd: float) -> None:
+        """Log cost to cost_logs table."""
+        data = {
+            "session_id": session_id,
+            "service": service,
+            "units": float(units),  # Ensure it's a float
+            "unit_type": unit_type,
+            "cost_usd": float(cost_usd),  # Ensure it's a float
+        }
+        def from_db():
+            try:
+                result = self.client.table("cost_logs").insert(data).execute()
+                logger.info(f"Logged cost: {service} = ${cost_usd:.6f} ({units} {unit_type})")
+            except Exception as e:
+                logger.error(f"Could not log cost: {e}, data: {data}")
+        def from_memory():
+            pass  # In-memory doesn't track costs
+        self._db(from_db, from_memory)
+    
+    def cleanup_abandoned_sessions(self, timeout_minutes: int = 30) -> int:
+        """Mark sessions as abandoned if they've been active for more than timeout_minutes."""
+        cutoff_time = (datetime.now() - timedelta(minutes=timeout_minutes)).isoformat()
+        def from_db():
+            try:
+                res = self.client.table("sessions").update({"status": "abandoned"}).eq("status", "active").lt("started_at", cutoff_time).execute()
+                return len(res.data) if res.data else 0
+            except Exception as e:
+                logger.error(f"Failed to cleanup sessions: {e}")
+                return 0
+        def from_memory():
+            count = 0
+            for sid, session in self._sessions.items():
+                if session.get("status") == "active":
+                    started = session.get("started_at")
+                    if started:
+                        try:
+                            started_dt = datetime.fromisoformat(started.replace("Z", "+00:00"))
+                            if (datetime.now() - started_dt.replace(tzinfo=None)).total_seconds() > timeout_minutes * 60:
+                                session["status"] = "abandoned"
+                                count += 1
+                        except:
+                            pass
+            return count
+        return self._db(from_db, from_memory)
+    
     def end_session(self, session_id: str, contact_number: str = None, summary: str = None, cost_breakdown: dict = None) -> None:
         update = {"ended_at": datetime.now().isoformat(), "status": "completed"}
         if contact_number:
@@ -291,6 +410,36 @@ class Database:
             update["summary"] = summary
         if cost_breakdown:
             update["cost_breakdown"] = cost_breakdown
+            
+            # Log individual costs to cost_logs (always log, even if 0)
+            breakdown = cost_breakdown.get("breakdown", {})
+            
+            # STT
+            stt_minutes = breakdown.get("stt_minutes", 0)
+            self.log_cost(
+                session_id, "deepgram_stt",
+                stt_minutes,
+                "minutes",
+                cost_breakdown.get("stt", 0)
+            )
+            
+            # TTS
+            tts_characters = breakdown.get("tts_characters", 0)
+            self.log_cost(
+                session_id, "cartesia_tts",
+                tts_characters,
+                "characters",
+                cost_breakdown.get("tts", 0)
+            )
+            
+            # LLM
+            llm_total_tokens = breakdown.get("llm_total_tokens", 0)
+            self.log_cost(
+                session_id, "openai_llm",
+                llm_total_tokens,
+                "tokens",
+                cost_breakdown.get("llm", 0)
+            )
         
         session = self.get_session(session_id)
         if session and session.get("started_at"):
