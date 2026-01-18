@@ -1,11 +1,23 @@
 # LiveKit Agents Framework
 livekit-agents>=1.0.0
 
-# Official LiveKit Plugins (these handle EVERYTHING)
-livekit-plugins-deepgram>=1.0.0   # STT
-livekit-plugins-cartesia>=1.0.0   # TTS
-livekit-plugins-openai>=1.0.0     # LLM
-livekit-plugins-silero>=1.0.0     # VAD
+# Official LiveKit Plugins
+livekit-plugins-deepgram>=1.0.0
+livekit-plugins-cartesia>=1.0.0
+livekit-plugins-openai>=1.0.0
+livekit-plugins-silero>=1.0.0
+
+# LiveKit Server SDK (for token generation)
+livekit-api>=0.6.0
+
+# FastAPI for REST API
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+
+# Authentication
+pyjwt>=2.8.0
+bcrypt>=4.1.0
 
 # Database
 supabase>=2.3.0

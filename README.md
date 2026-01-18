@@ -1,144 +1,233 @@
-# Voice Agent - Appointment Booking Assistant
+# SuperBryn Voice Agent
 
-A voice-based appointment booking agent built with **LiveKit Agents**.
+A production-ready voice appointment booking system with AI assistant, visual avatar, and comprehensive admin dashboard.
 
-## Architecture
+## 🎯 Features
+
+### User Portal (`/`)
+- Voice-based appointment booking with AI assistant
+- Visual avatar synced with speech (Beyond Presence)
+- Real-time transcript display
+- Tool call visualization
+- Session history with status tags (Pending/Booked/Completed)
+- End-of-call summary with cost breakdown
+
+### Mentor Portal (`/mentor`)
+- Outlook-style calendar view
+- Appointment management
+- Availability scheduling (add dates and time slots)
+- View who has booked appointments
+
+### Admin Portal (`/admin`)
+- Dashboard with key metrics
+- User management (view, add, delete)
+- Mentor management
+- Session viewer (full conversation history)
+- Cost tracking and breakdown per session
+
+## 🏗️ Architecture
 
 ```
-User speaks → LiveKit WebRTC → Agent Worker
-                                    │
-                                    ▼
-                              ┌─────────────┐
-                              │ Silero VAD  │  Voice Activity Detection
-                              └─────┬───────┘
-                                    │
-                                    ▼
-                              ┌─────────────┐
-                              │Deepgram STT │  Speech-to-Text
-                              └─────┬───────┘
-                                    │
-                                    ▼
-                              ┌─────────────┐
-                              │ OpenAI LLM  │  Intent + Tool Calling
-                              └─────┬───────┘
-                                    │
-                                    ▼
-                              ┌─────────────┐
-                              │Cartesia TTS │  Text-to-Speech
-                              └─────┬───────┘
-                                    │
-                                    ▼
-                              LiveKit WebRTC → User hears response
+┌─────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (Next.js)                          │
+├──────────────────┬──────────────────┬──────────────────────────────┤
+│    User Chat     │  Mentor Calendar │       Admin Dashboard         │
+│  + LiveKit Room  │  + Availability  │  + Stats, Users, Sessions    │
+│  + Avatar        │  + Appointments  │  + Cost Tracking             │
+└────────┬─────────┴────────┬─────────┴────────────┬─────────────────┘
+         │                  │                      │
+         │ WebRTC           │ REST API             │ REST API
+         │                  │                      │
+┌────────▼──────────────────▼──────────────────────▼─────────────────┐
+│                         BACKEND                                      │
+├─────────────────────────────┬───────────────────────────────────────┤
+│    LiveKit Agent (main.py)  │        FastAPI (api.py)               │
+│    - Deepgram STT           │        - Auth endpoints               │
+│    - OpenAI LLM + Tools     │        - User/Mentor CRUD             │
+│    - Cartesia TTS           │        - Appointments                 │
+│    - Session tracking       │        - Sessions                     │
+└────────────────┬────────────┴───────────────────┬───────────────────┘
+                 │                                │
+                 └────────────────┬───────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │      Supabase Database     │
+                    │  - users, mentors, admins │
+                    │  - appointments            │
+                    │  - sessions, messages      │
+                    │  - mentor_availability     │
+                    │  - cost_logs              │
+                    └───────────────────────────┘
 ```
 
-## Stack
+## 🚀 Quick Start
 
-| Component | Provider | Purpose |
-|-----------|----------|---------|
-| Voice Pipeline | LiveKit Agents | WebRTC, orchestration |
-| STT | Deepgram Nova-2 | Speech recognition |
-| LLM | OpenAI GPT-4o-mini | Conversation + tools |
-| TTS | Cartesia Sonic-2 | Voice synthesis |
-| VAD | Silero | Endpoint detection |
-| Database | Supabase | Appointments storage |
+### 1. Database Setup
 
-## Setup
+1. Create a Supabase project at [supabase.com](https://supabase.com)
+2. Run `backend/schema.sql` in the SQL Editor
 
-### 1. Install dependencies
+### 2. Backend Setup
 
 ```bash
-pip install -r requirements.txt
+cd backend
+
+# Create .env file
+cat > .env << EOF
+LIVEKIT_URL=wss://your-project.livekit.cloud
+LIVEKIT_API_KEY=your-api-key
+LIVEKIT_API_SECRET=your-api-secret
+DEEPGRAM_API_KEY=your-deepgram-key
+CARTESIA_API_KEY=your-cartesia-key
+CARTESIA_VOICE_ID=a0e99841-438c-4a64-b679-ae501e7d6091
+OPENAI_API_KEY=your-openai-key
+OPENAI_MODEL=gpt-4o-mini
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
+JWT_SECRET=your-jwt-secret-change-this
+EOF
+
+# Install dependencies
+pip install -r ../requirements.txt
+
+# Start API server
+uvicorn api:app --reload --port 8000
+
+# In another terminal, start voice agent
+python main.py dev
 ```
 
-### 2. Configure environment
-
-Copy `.env.example` to `backend/.env` and fill in your API keys:
+### 3. Frontend Setup
 
 ```bash
-cp .env.example backend/.env
+cd frontend
+
+# Create .env.local
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
 ```
 
-Required keys:
-- `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` - from [LiveKit Cloud](https://cloud.livekit.io)
-- `DEEPGRAM_API_KEY` - from [Deepgram](https://console.deepgram.com)
-- `CARTESIA_API_KEY` - from [Cartesia](https://cartesia.ai)
-- `OPENAI_API_KEY` - from [OpenAI](https://platform.openai.com)
-- `SUPABASE_URL`, `SUPABASE_KEY` - optional, from [Supabase](https://supabase.com)
+### 4. Access
 
-### 3. Run the agent
+- **User Portal**: http://localhost:3000
+- **Mentor Portal**: http://localhost:3000/mentor/login
+- **Admin Portal**: http://localhost:3000/admin/login
 
-```bash
-# Development mode (auto-reloads)
-python backend/main.py dev
+**Default Credentials:**
+- Mentor: `sarah@example.com` / `mentor123`
+- Admin: `admin@superbryn.com` / `admin123`
 
-# Production mode
-python backend/main.py start
-```
-
-### 4. Connect a frontend
-
-Use LiveKit's [Agents Playground](https://agents-playground.livekit.io) to test, or build your own frontend with the [LiveKit Client SDK](https://docs.livekit.io/client-sdk/).
-
-## Database Schema (Supabase)
-
-If using Supabase, create these tables:
-
-```sql
--- Users
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contact_number TEXT UNIQUE NOT NULL,
-  name TEXT DEFAULT 'User',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Appointments
-CREATE TABLE appointments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contact_number TEXT REFERENCES users(contact_number),
-  date DATE NOT NULL,
-  time TIME NOT NULL,
-  status TEXT DEFAULT 'booked',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Conversation logs
-CREATE TABLE conversations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contact_number TEXT,
-  summary TEXT,
-  actions JSONB DEFAULT '[]',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 Voice-Agent/
 ├── backend/
-│   ├── main.py      # Agent + tools (single file!)
-│   └── db.py        # Database operations
-├── frontend/        # (Add your frontend here)
+│   ├── main.py          # LiveKit voice agent
+│   ├── api.py           # FastAPI REST endpoints
+│   ├── db.py            # Database operations
+│   └── schema.sql       # Supabase schema
+├── frontend/
+│   └── src/
+│       ├── app/
+│       │   ├── page.tsx           # User login
+│       │   ├── chat/page.tsx      # User chat interface
+│       │   ├── mentor/
+│       │   │   ├── login/page.tsx
+│       │   │   └── page.tsx       # Mentor dashboard
+│       │   └── admin/
+│       │       ├── login/page.tsx
+│       │       └── page.tsx       # Admin dashboard
+│       └── lib/
+│           ├── api.ts             # API client
+│           └── store.ts           # Zustand stores
 ├── requirements.txt
-└── .env.example
+└── README.md
 ```
 
-## Tools Available
+## 🔧 API Endpoints
 
-The agent has these function tools:
+### Authentication
+- `POST /api/auth/user/login` - User login (phone + name)
+- `POST /api/auth/mentor/login` - Mentor login (email + password)
+- `POST /api/auth/admin/login` - Admin login
+- `GET /api/auth/me` - Get current user
+
+### Users
+- `GET /api/users` - List users (admin)
+- `POST /api/users` - Create user (admin)
+- `GET /api/users/{phone}/sessions` - User's sessions
+- `GET /api/users/{phone}/appointments` - User's appointments
+
+### Mentors
+- `GET /api/mentors` - List mentors
+- `POST /api/mentors` - Create mentor (admin)
+- `GET /api/mentors/{id}/availability` - Get availability
+- `POST /api/mentors/{id}/availability` - Add availability
+- `GET /api/mentors/{id}/slots?date=YYYY-MM-DD` - Get slots for date
+
+### Appointments
+- `GET /api/appointments` - List appointments
+- `GET /api/appointments/calendar` - Calendar view
+- `PUT /api/appointments/{id}` - Update status/notes
+
+### Sessions
+- `GET /api/sessions` - List all sessions (admin)
+- `GET /api/sessions/{id}` - Session with messages
+
+### Admin
+- `GET /api/admin/stats` - Dashboard statistics
+- `GET /api/admin/costs` - Cost report
+- `GET /api/admin/costs/sessions` - Per-session costs
+
+### LiveKit
+- `GET /api/livekit/token` - Get room token for voice chat
+
+## 🤖 Voice Agent Tools
 
 | Tool | Description |
 |------|-------------|
-| `lookup_user` | Identify user by phone number |
-| `get_available_slots` | Show available appointment times |
-| `book_appointment` | Book a new appointment |
-| `get_my_appointments` | List user's appointments |
-| `cancel_appointment` | Cancel an existing appointment |
-| `end_call` | End call with summary |
+| `identify_user` | Identify user by phone, load context |
+| `fetch_slots` | Get available appointment slots |
+| `book_appointment` | Book an appointment |
+| `retrieve_appointments` | Get user's appointments |
+| `cancel_appointment` | Cancel an appointment |
+| `modify_appointment` | Reschedule appointment |
+| `end_conversation` | End call with summary |
 
-## License
+## 💰 Cost Tracking
+
+The system tracks costs for:
+- **Deepgram STT**: $0.0043/minute
+- **Cartesia TTS**: $0.0015/100 characters
+- **OpenAI GPT-4o-mini**: $0.00015/1K input, $0.0006/1K output
+
+Costs are displayed at end of each call and aggregated in admin dashboard.
+
+## 🔌 Beyond Presence Avatar Integration
+
+To integrate Beyond Presence avatar:
+
+1. Sign up at [beyondpresence.ai](https://beyondpresence.ai)
+2. Get your API credentials
+3. Replace the avatar placeholder in `frontend/src/app/chat/page.tsx`:
+
+```tsx
+// Replace the avatar container with Beyond Presence component
+import { BeyondPresenceAvatar } from '@beyondpresence/react';
+
+<BeyondPresenceAvatar
+  apiKey={process.env.NEXT_PUBLIC_BP_API_KEY}
+  avatarId="your-avatar-id"
+  isSpeaking={isSpeaking}
+  audioStream={audioStream}
+/>
+```
+
+## 📝 License
 
 MIT
-

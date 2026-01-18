@@ -1,0 +1,290 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/store";
+
+type Tab = "overview" | "users" | "mentors" | "sessions" | "costs";
+
+export default function AdminDashboard() {
+  const router = useRouter();
+  const { user, logout } = useAuth();
+  const [tab, setTab] = useState<Tab>("overview");
+  const [stats, setStats] = useState<any>(null);
+  const [users, setUsers] = useState<any[]>([]);
+  const [mentors, setMentors] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [costs, setCosts] = useState<any[]>([]);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
+
+  useEffect(() => {
+    if (!user || user.type !== "admin") {
+      router.push("/admin/login");
+      return;
+    }
+    loadData();
+  }, [user, router, tab]);
+
+  const loadData = async () => {
+    try {
+      if (tab === "overview") {
+        const data = await api.getAdminStats();
+        setStats(data);
+      } else if (tab === "users") {
+        const data = await api.getUsers();
+        setUsers(data);
+      } else if (tab === "mentors") {
+        const data = await api.getMentors();
+        setMentors(data);
+      } else if (tab === "sessions") {
+        const data = await api.getSessions();
+        setSessions(data);
+      } else if (tab === "costs") {
+        const data = await api.getSessionCosts();
+        setCosts(data);
+      }
+    } catch (err) {
+      console.error("Failed to load data:", err);
+    }
+  };
+
+  const viewSession = async (id: string) => {
+    try {
+      const data = await api.getSession(id);
+      setSelectedSession(data);
+    } catch (err) {
+      console.error("Failed to load session:", err);
+    }
+  };
+
+  const handleLogout = () => {
+    api.logout();
+    logout();
+    router.push("/admin/login");
+  };
+
+  if (!user) return null;
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "users", label: "Users" },
+    { id: "mentors", label: "Mentors" },
+    { id: "sessions", label: "Sessions" },
+    { id: "costs", label: "Costs" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <div className="bg-slate-800 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-xl font-bold">Admin Dashboard</h1>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-slate-300">{user.email}</span>
+            <button onClick={handleLogout} className="text-slate-300 hover:text-white">Logout</button>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex space-x-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg ${tab === t.id ? "bg-gray-100 text-slate-800" : "text-slate-300 hover:text-white"}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Overview Tab */}
+        {tab === "overview" && stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white p-6 rounded-xl shadow">
+              <p className="text-sm text-gray-500">Total Users</p>
+              <p className="text-3xl font-bold text-slate-800">{stats.total_users || 0}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow">
+              <p className="text-sm text-gray-500">Total Mentors</p>
+              <p className="text-3xl font-bold text-emerald-600">{stats.total_mentors || 0}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow">
+              <p className="text-sm text-gray-500">Total Sessions</p>
+              <p className="text-3xl font-bold text-indigo-600">{stats.total_sessions || 0}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow">
+              <p className="text-sm text-gray-500">Total Cost</p>
+              <p className="text-3xl font-bold text-amber-600">${(stats.total_cost || 0).toFixed(2)}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow">
+              <p className="text-sm text-gray-500">Total Appointments</p>
+              <p className="text-3xl font-bold">{stats.total_appointments || 0}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow">
+              <p className="text-sm text-gray-500">Pending</p>
+              <p className="text-3xl font-bold text-yellow-600">{stats.pending_appointments || 0}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow">
+              <p className="text-sm text-gray-500">Booked</p>
+              <p className="text-3xl font-bold text-blue-600">{stats.booked_appointments || 0}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow">
+              <p className="text-sm text-gray-500">Completed</p>
+              <p className="text-3xl font-bold text-green-600">{stats.completed_appointments || 0}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {tab === "users" && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Name</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Phone</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Created</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {users.map((u) => (
+                  <tr key={u.id}>
+                    <td className="px-4 py-3">{u.name}</td>
+                    <td className="px-4 py-3 text-gray-500">{u.contact_number}</td>
+                    <td className="px-4 py-3 text-gray-500 text-sm">{new Date(u.created_at).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Mentors Tab */}
+        {tab === "mentors" && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Name</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Specialty</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {mentors.map((m) => (
+                  <tr key={m.id}>
+                    <td className="px-4 py-3 font-medium">{m.name}</td>
+                    <td className="px-4 py-3 text-gray-500">{m.email}</td>
+                    <td className="px-4 py-3 text-gray-500">{m.specialty}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 text-xs rounded-full ${m.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                        {m.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Sessions Tab */}
+        {tab === "sessions" && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">User</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Started</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Duration</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {sessions.map((s) => (
+                  <tr key={s.id}>
+                    <td className="px-4 py-3">{s.users?.name || s.contact_number || "Unknown"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{new Date(s.started_at).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm">{s.duration_seconds ? `${Math.round(s.duration_seconds / 60)}m` : "-"}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 text-xs rounded-full ${s.status === "completed" ? "bg-green-100 text-green-700" : s.status === "active" ? "bg-blue-100 text-blue-700" : "bg-gray-100"}`}>
+                        {s.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => viewSession(s.id)} className="text-indigo-600 hover:underline text-sm">View</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Costs Tab */}
+        {tab === "costs" && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Session</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">User</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">STT</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">TTS</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">LLM</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {costs.map((c) => (
+                  <tr key={c.id}>
+                    <td className="px-4 py-3 text-sm font-mono">{c.id?.slice(0, 8)}...</td>
+                    <td className="px-4 py-3">{c.users?.name || c.contact_number || "-"}</td>
+                    <td className="px-4 py-3 text-sm">${(c.cost_breakdown?.stt || 0).toFixed(4)}</td>
+                    <td className="px-4 py-3 text-sm">${(c.cost_breakdown?.tts || 0).toFixed(4)}</td>
+                    <td className="px-4 py-3 text-sm">${(c.cost_breakdown?.llm || 0).toFixed(4)}</td>
+                    <td className="px-4 py-3 font-medium">${(c.cost_breakdown?.total || 0).toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Session Detail Modal */}
+      {selectedSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="font-bold">Session Details</h2>
+              <button onClick={() => setSelectedSession(null)}>✕</button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <p className="text-sm text-gray-500 mb-4">
+                Started: {new Date(selectedSession.session.started_at).toLocaleString()}
+                {selectedSession.session.summary && ` • Summary: ${selectedSession.session.summary}`}
+              </p>
+              <div className="space-y-2">
+                {selectedSession.messages.map((m: any, i: number) => (
+                  <div key={i} className={`p-2 rounded ${m.role === "user" ? "bg-blue-50 ml-8" : m.role === "tool" ? "bg-yellow-50" : "bg-gray-50 mr-8"}`}>
+                    <p className="text-xs font-medium text-gray-500 mb-1">{m.role} {m.tool_name && `(${m.tool_name})`}</p>
+                    <p className="text-sm">{m.content}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
