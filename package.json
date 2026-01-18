@@ -1,0 +1,23 @@
+{
+  "name": "voice-agent",
+  "version": "1.0.0",
+  "description": "AI-Powered Voice Appointment Booking System",
+  "scripts": {
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "install:backend": "bash install.sh",
+    "install:frontend": "cd frontend && npm install",
+    "start": "bash start.sh",
+    "start:windows": "start.bat",
+    "start:api": "cd backend && python api.py",
+    "start:agent": "cd backend && python main.py start",
+    "start:frontend": "cd frontend && npm run dev"
+  },
+  "keywords": [
+    "voice-agent",
+    "livekit",
+    "ai",
+    "appointment-booking"
+  ],
+  "author": "",
+  "license": "MIT"
+}
