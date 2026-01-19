@@ -133,7 +133,7 @@ export default function LiveKitRoom({
             participant.videoTrackPublications.forEach((pub) => {
               if (!pub.isSubscribed) {
                 console.log(`Subscribing to video track: ${pub.trackSid}`);
-                participant.setSubscribed(pub.trackSid, true);
+                pub.setSubscribed(true);
               } else if (pub.track) {
                 // Track already subscribed, attach it
                 handleExistingTrack(pub.track, participant);
@@ -170,7 +170,7 @@ export default function LiveKitRoom({
             participant.videoTrackPublications.forEach((pub) => {
               if (!pub.isSubscribed) {
                 console.log(`Subscribing to existing video track: ${pub.trackSid}`);
-                participant.setSubscribed(pub.trackSid, true);
+                pub.setSubscribed(true);
               } else if (pub.track) {
                 // Already subscribed, attach it
                 handleExistingTrack(pub.track, participant);
