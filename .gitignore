@@ -10,6 +10,16 @@ wheels/
 .venv
 .env
 .env.local
+.env.template
 
 # Vercel
 .vercel
+
+# Logs
+logs/
+*.log
+
+# Frontend build
+frontend/.next
+frontend/out
+frontend/build
