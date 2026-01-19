@@ -14,6 +14,15 @@ const config: Config = {
           700: '#4338ca',
         },
       },
+      keyframes: {
+        'pulse-scale': {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.1)' },
+        },
+      },
+      animation: {
+        'pulse-scale': 'pulse-scale 2s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

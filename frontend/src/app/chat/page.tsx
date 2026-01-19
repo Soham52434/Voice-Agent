@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Github } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth, useChat } from "@/lib/store";
 import LiveKitRoom from "@/components/LiveKitRoom";
@@ -72,6 +73,16 @@ export default function ChatPage() {
     try {
       clearChat();
       setIsConnecting(true);
+      
+      // Check if getUserMedia is available (requires HTTPS in production)
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const errorMsg = isSecure
+          ? "Your browser doesn't support microphone access. Please use a modern browser like Chrome, Firefox, or Safari."
+          : "Microphone access requires HTTPS. Please access this site via HTTPS (not HTTP).";
+        throw new Error(errorMsg);
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setAudioStream(stream);
       const data = await api.getLiveKitToken();
@@ -237,7 +248,17 @@ export default function ChatPage() {
             </svg>
           </button>
           <h1 className="text-lg font-semibold text-white">Voice Assistant</h1>
-          <div className="w-6" />
+          <a
+            href="https://github.com/Soham52434/Voice-Agent/blob/main/README.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-300 animate-pulse-scale"
+            title="View README for setup instructions and credentials"
+          >
+            <Github className="w-5 h-5 text-white relative z-10" />
+            <span className="absolute inset-0 rounded-full animate-ping opacity-20 bg-white"></span>
+            <span className="absolute inset-0 rounded-full animate-pulse bg-white/10"></span>
+          </a>
         </div>
 
         {/* Avatar Container - Full Screen */}

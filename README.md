@@ -4,7 +4,7 @@
 
 **A production-ready voice appointment booking platform with AI assistant, full-screen avatar, and comprehensive admin dashboard**
 
-[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-21-black)](https://nextjs.org/)
 [![LiveKit](https://img.shields.io/badge/LiveKit-Agents-blue)](https://livekit.io/)
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://python.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-Database-green)](https://supabase.com/)
@@ -12,6 +12,37 @@
 **🚀 [Deploy on Railway](#-railway-deployment) | 📖 [User Flows](#-user-flows) | 🏗️ [Architecture](#-architecture)**
 
 </div>
+
+---
+
+## 🔑 Quick Access: Default Credentials
+
+> **⚠️ Important:** These are the default credentials created by the database schema. Change them in production!
+
+### 👨‍⚕️ Mentor Accounts
+
+| Name | Email | Password | Specialty |
+|------|-------|-----------|------------|
+| **Dr. Sarah Smith** | `sarah@example.com` | `mentor123` | General Consultation |
+| **Dr. John Doe** | `john@example.com` | `mentor123` | Technical Review |
+
+**Login URL:** `/mentor/login`
+
+### 👨‍💼 Admin Account
+
+| Email | Password | Role |
+|-------|----------|------|
+| `admin@superbryn.com` | `admin123` | Super Admin |
+
+**Login URL:** `/admin/login`
+
+### 👤 User Access
+
+Users don't need login credentials. They are **voice-verified** through the AI agent:
+1. Visit `/chat`
+2. Click "Start Voice Chat"
+3. Provide your phone number when asked
+4. The system will identify or create your account automatically
 
 ---
 

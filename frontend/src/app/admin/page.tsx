@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Github } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/store";
 
@@ -101,6 +102,17 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold">Admin Dashboard</h1>
           <div className="flex items-center space-x-4">
+            <a
+              href="https://github.com/Soham52434/Voice-Agent/blob/main/README.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-300 animate-pulse-scale"
+              title="View README for setup instructions and credentials"
+            >
+              <Github className="w-5 h-5 text-white relative z-10" />
+              <span className="absolute inset-0 rounded-full animate-ping opacity-20 bg-white"></span>
+              <span className="absolute inset-0 rounded-full animate-pulse bg-white/10"></span>
+            </a>
             <span className="text-sm text-slate-300">{user.email}</span>
             <button onClick={handleLogout} className="text-slate-300 hover:text-white">Logout</button>
           </div>

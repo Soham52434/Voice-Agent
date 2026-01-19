@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Github } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/store";
 
@@ -168,6 +169,17 @@ export default function MentorDashboard() {
         <div className="bg-white border-b border-gray-200 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
+              <a
+                href="https://github.com/Soham52434/Voice-Agent/blob/main/README.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-all duration-300 animate-pulse-scale"
+                title="View README for setup instructions and credentials"
+              >
+                <Github className="w-5 h-5 text-gray-700 relative z-10" />
+                <span className="absolute inset-0 rounded-full animate-ping opacity-20 bg-gray-400"></span>
+                <span className="absolute inset-0 rounded-full animate-pulse bg-gray-300/50"></span>
+              </a>
               <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-gray-100 rounded">
                 <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
