@@ -23,3 +23,5 @@ logs/
 frontend/.next
 frontend/out
 frontend/build
+
+RAILWAY_DEPLOYMENT_STEPS.md

@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     # LiveKit Agents Framework
-    "livekit-agents[bey]~=1.3",
+    "livekit-agents[bey]>=1.0.0",
     # Official LiveKit Plugins
     "livekit-plugins-deepgram>=1.0.0",
     "livekit-plugins-cartesia>=1.0.0",
