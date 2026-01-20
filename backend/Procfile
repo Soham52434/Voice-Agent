@@ -1,1 +1,1 @@
-web: cd backend && python api.py
+web: python api.py

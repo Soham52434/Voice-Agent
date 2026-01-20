@@ -274,10 +274,12 @@ Deploy **3 separate Railway services**:
 ### Step 1: Prepare Your Repository
 
 The repository already includes:
-- ✅ `backend/Procfile` - API service start command
-- ✅ `backend/Procfile-agent` - Agent worker start command
-- ✅ `frontend/Procfile` - Frontend start command
+- ✅ `backend/Procfile` - API service start command (`python api.py`)
+- ✅ `backend/Procfile-agent` - Agent worker start command (`python main.py start`)
+- ✅ `frontend/Procfile` - Frontend start command (`npm run start`)
 - ✅ Updated code for Railway (PORT handling, CORS, etc.)
+
+**Important:** When setting Root Directory in Railway, use `backend` or `frontend` (not `/backend` or `/frontend`). Railway will automatically find the Procfile in that directory.
 
 ### Step 2: Create Railway Project
 
@@ -289,9 +291,9 @@ The repository already includes:
 ### Step 3: Deploy API Service
 
 1. **Add Service** → **GitHub Repo** (if not auto-detected)
-2. **Root Directory:** `/backend`
-3. **Build Command:** `pip install -r ../requirements.txt`
-4. **Start Command:** `cd backend && python api.py`
+2. **Root Directory:** `backend`
+3. **Build Command:** `pip install -r ../requirements.txt` (or leave blank - Railway auto-detects)
+4. **Start Command:** Leave blank (Railway will use `backend/Procfile` which runs `python api.py`)
 5. **Generate Public URL** (click "Generate Domain")
 6. **Add Environment Variables:**
    ```
@@ -308,9 +310,9 @@ The repository already includes:
 ### Step 4: Deploy Agent Worker
 
 1. **Add Service** → **GitHub Repo** (same repo)
-2. **Root Directory:** `/backend`
-3. **Build Command:** `pip install -r ../requirements.txt`
-4. **Start Command:** `cd backend && python main.py start`
+2. **Root Directory:** `backend`
+3. **Build Command:** `pip install -r ../requirements.txt` (or leave blank - Railway auto-detects)
+4. **Start Command:** `python main.py start` (or leave blank and Railway will use Procfile)
 5. **No Public URL needed** (internal worker)
 6. **Add Environment Variables:**
    ```
@@ -331,9 +333,9 @@ The repository already includes:
 ### Step 5: Deploy Frontend Service
 
 1. **Add Service** → **GitHub Repo** (same repo)
-2. **Root Directory:** `/frontend`
-3. **Build Command:** `npm install && npm run build`
-4. **Start Command:** `npm run start`
+2. **Root Directory:** `frontend`
+3. **Build Command:** `npm install && npm run build` (or leave blank - Railway auto-detects)
+4. **Start Command:** Leave blank (Railway will use `frontend/Procfile` which runs `npm run start`)
 5. **Generate Public URL** (click "Generate Domain")
 6. **Add Environment Variables:**
    ```
@@ -405,6 +407,15 @@ Railway automatically monitors:
 - Update `ALLOWED_ORIGINS` with exact frontend URL
 - Include protocol (`https://`) in URL
 - Restart API service after updating
+
+**"No start command was found" Error:**
+- Ensure Root Directory is set to `backend` (not `/backend`) for API/Agent services
+- Ensure Root Directory is set to `frontend` (not `/frontend`) for Frontend service
+- Verify Procfile exists in the root directory you specified
+- If Procfile isn't detected, manually set Start Command in Railway service settings:
+  - API: `python api.py`
+  - Agent: `python main.py start`
+  - Frontend: `npm run start`
 
 ### Cost Optimization
 
