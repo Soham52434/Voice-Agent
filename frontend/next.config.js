@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Use custom server for Railway deployment
-  // output: 'standalone', // Commented out - using custom server.js instead
+  // Standard Next.js config for Railway
+  // Railway handles PORT automatically
 };
 
 module.exports = nextConfig;
