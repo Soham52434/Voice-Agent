@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Optimized for production deployment (Railway)
-  output: 'standalone',
-  // Railway handles port automatically via PORT env var
-  // Next.js will use PORT if provided, otherwise defaults to 3000
+  // Use custom server for Railway deployment
+  // output: 'standalone', // Commented out - using custom server.js instead
 };
 
 module.exports = nextConfig;
