@@ -39,9 +39,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS configuration - use ALLOWED_ORIGINS env var in production
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+# In development, allow localhost
+if os.getenv("ENVIRONMENT") != "production":
+    allowed_origins.extend(["http://localhost:3000", "http://127.0.0.1:3000"])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,7 +57,12 @@ app.add_middleware(
 db = Database()
 security = HTTPBearer(auto_error=False)
 
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
+# JWT Secret - fail in production if not set
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET or JWT_SECRET == "your-secret-key-change-in-production":
+    if os.getenv("ENVIRONMENT") == "production" or os.getenv("RAILWAY_ENVIRONMENT"):
+        raise ValueError("JWT_SECRET must be set in production! Set it in Railway environment variables.")
+    JWT_SECRET = "dev-secret-key-only-for-local-development"  # Only for local dev
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 24
 
@@ -653,5 +665,8 @@ async def db_status():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # Railway provides PORT env var, use 0.0.0.0 to accept external connections
+    port = int(os.getenv("PORT", "8000"))
+    host = os.getenv("HOST", "0.0.0.0")
+    uvicorn.run(app, host=host, port=port)
 

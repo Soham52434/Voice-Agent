@@ -254,6 +254,172 @@ graph TD
 - Beyond Presence (Avatar)
 
 
+## 🚀 Railway Deployment
+
+Deploy all three services (API, Agent Worker, Frontend) to Railway with minimal configuration.
+
+### Architecture
+
+Deploy **3 separate Railway services**:
+1. **API Service** - FastAPI REST API (`backend/api.py`)
+2. **Agent Worker** - LiveKit Agent (`backend/main.py`)
+3. **Frontend Service** - Next.js app (`frontend/`)
+
+### Prerequisites
+
+- Railway account ([railway.app](https://railway.app))
+- GitHub repository with your code
+- All API keys (Supabase, LiveKit, OpenAI, Deepgram, Cartesia, BEY)
+
+### Step 1: Prepare Your Repository
+
+The repository already includes:
+- ✅ `backend/Procfile` - API service start command
+- ✅ `backend/Procfile-agent` - Agent worker start command
+- ✅ `frontend/Procfile` - Frontend start command
+- ✅ Updated code for Railway (PORT handling, CORS, etc.)
+
+### Step 2: Create Railway Project
+
+1. Go to [railway.app](https://railway.app) and sign in
+2. Click **"New Project"** → **"Deploy from GitHub repo"**
+3. Select your repository
+4. Railway will detect the services automatically
+
+### Step 3: Deploy API Service
+
+1. **Add Service** → **GitHub Repo** (if not auto-detected)
+2. **Root Directory:** `/backend`
+3. **Build Command:** `pip install -r ../requirements.txt`
+4. **Start Command:** `cd backend && python api.py`
+5. **Generate Public URL** (click "Generate Domain")
+6. **Add Environment Variables:**
+   ```
+   SUPABASE_URL=https://xxx.supabase.co
+   SUPABASE_KEY=xxx
+   JWT_SECRET=your-secure-random-secret-here
+   LIVEKIT_URL=wss://xxx.livekit.cloud
+   LIVEKIT_API_KEY=xxx
+   LIVEKIT_API_SECRET=xxx
+   ALLOWED_ORIGINS=https://your-frontend.railway.app
+   ```
+   > **Note:** Set `ALLOWED_ORIGINS` after you get the frontend URL
+
+### Step 4: Deploy Agent Worker
+
+1. **Add Service** → **GitHub Repo** (same repo)
+2. **Root Directory:** `/backend`
+3. **Build Command:** `pip install -r ../requirements.txt`
+4. **Start Command:** `cd backend && python main.py start`
+5. **No Public URL needed** (internal worker)
+6. **Add Environment Variables:**
+   ```
+   LIVEKIT_URL=wss://xxx.livekit.cloud
+   LIVEKIT_API_KEY=xxx
+   LIVEKIT_API_SECRET=xxx
+   OPENAI_API_KEY=sk-xxx
+   DEEPGRAM_API_KEY=xxx
+   CARTESIA_API_KEY=xxx
+   BEY_API_KEY=xxx
+   BEY_AVATAR_ID=1c7a7291-ee28-4800-8f34-acfbfc2d07c0
+   SUPABASE_URL=https://xxx.supabase.co
+   SUPABASE_KEY=xxx
+   OPENAI_MODEL=gpt-4o-mini
+   CARTESIA_VOICE_ID=a0e99841-438c-4a64-b679-ae501e7d6091
+   ```
+
+### Step 5: Deploy Frontend Service
+
+1. **Add Service** → **GitHub Repo** (same repo)
+2. **Root Directory:** `/frontend`
+3. **Build Command:** `npm install && npm run build`
+4. **Start Command:** `npm run start`
+5. **Generate Public URL** (click "Generate Domain")
+6. **Add Environment Variables:**
+   ```
+   NEXT_PUBLIC_API_URL=https://your-api-service.up.railway.app
+   NEXT_PUBLIC_LIVEKIT_URL=wss://xxx.livekit.cloud
+   ```
+   > **Important:** Replace `your-api-service` with your actual API service URL
+
+### Step 6: Update CORS in API Service
+
+After getting the frontend URL, update the API service:
+1. Go to **API Service** → **Variables**
+2. Update `ALLOWED_ORIGINS`:
+   ```
+   ALLOWED_ORIGINS=https://your-frontend-service.up.railway.app
+   ```
+3. Service will automatically restart
+
+### Environment Variables Summary
+
+**Shared (all services):**
+- `SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_KEY` - Your Supabase service role key
+
+**API Service only:**
+- `JWT_SECRET` - Random secret for JWT tokens
+- `ALLOWED_ORIGINS` - Comma-separated frontend URLs
+- `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` - For token generation
+
+**Agent Worker only:**
+- `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` - LiveKit connection
+- `OPENAI_API_KEY` - OpenAI API key
+- `DEEPGRAM_API_KEY` - Deepgram API key
+- `CARTESIA_API_KEY` - Cartesia API key
+- `BEY_API_KEY` - Beyond Presence API key
+- `BEY_AVATAR_ID` - Avatar ID (default provided)
+- `OPENAI_MODEL` - Optional (defaults to `gpt-4o-mini`)
+- `CARTESIA_VOICE_ID` - Optional (default provided)
+
+**Frontend Service only:**
+- `NEXT_PUBLIC_API_URL` - Your API service public URL
+- `NEXT_PUBLIC_LIVEKIT_URL` - Your LiveKit WebSocket URL
+
+### Health Checks
+
+Railway automatically monitors:
+- **API Service:** `GET /api/health`
+- **Frontend:** `GET /` (Next.js default)
+- **Agent Worker:** Internal process monitoring
+
+### Troubleshooting Railway Deployment
+
+**Build Failures:**
+- Check build logs in Railway dashboard
+- Verify all dependencies in `requirements.txt` and `package.json`
+- Ensure root directories are set correctly
+
+**Connection Issues:**
+- Verify `NEXT_PUBLIC_API_URL` matches API service URL exactly
+- Check `ALLOWED_ORIGINS` includes frontend URL
+- Ensure all environment variables are set
+
+**Agent Not Connecting:**
+- Check agent worker logs in Railway dashboard
+- Verify LiveKit credentials are correct
+- Ensure `LIVEKIT_URL` uses `wss://` protocol
+
+**CORS Errors:**
+- Update `ALLOWED_ORIGINS` with exact frontend URL
+- Include protocol (`https://`) in URL
+- Restart API service after updating
+
+### Cost Optimization
+
+- **Free Tier:** 500 hours/month, $5 credit
+- **Scaling:** Scale down agent worker when not in use
+- **Sleep:** Free tier services sleep after inactivity (auto-wake on request)
+
+### Monitoring
+
+- **Logs:** Real-time logs in Railway dashboard for each service
+- **Metrics:** CPU, memory, network usage per service
+- **Health:** Automatic health checks and alerts
+
+---
+
 ## 🔧 Troubleshooting
 
 ### Avatar Not Showing

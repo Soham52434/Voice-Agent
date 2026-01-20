@@ -1,4 +1,13 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Validate API URL - required in production
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_URL) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error("NEXT_PUBLIC_API_URL environment variable is required in production. Set it in Railway environment variables.");
+  }
+  // Fallback for local development only
+  console.warn("NEXT_PUBLIC_API_URL not set, using localhost (development only)");
+}
+const API_URL_FINAL = API_URL || 'http://localhost:8000';
 
 class ApiClient {
   private token: string | null = null;
@@ -24,7 +33,7 @@ class ApiClient {
       ...options.headers,
     };
 
-    const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+    const response = await fetch(`${API_URL_FINAL}${endpoint}`, { ...options, headers });
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
